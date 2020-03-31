@@ -1,7 +1,7 @@
 // custom graph component
 Vue.component('graph', {
 
-  props: ['data', 'dates', 'day', 'selectedData', 'scale', 'resize'],
+  props: ['data', 'dates', 'day', 'selectedData', 'selectedLocation', 'scale', 'resize'],
 
   template: '<div ref="graph" id="graph" style="height: 100%;"></div>',
 
@@ -282,7 +282,7 @@ let app = new Vue({
   el: '#root',
 
   mounted() {
-    this.pullData(this.selectedData);
+    this.pullData(this.selectedData, this.selectedLocation);
   },
 
   created: function() {
@@ -342,7 +342,11 @@ let app = new Vue({
 
   watch: {
     selectedData() {
-      this.pullData(this.selectedData);
+      this.pullData(this.selectedData, this.selectedLocation);
+    },
+
+    selectedLocation() {
+      this.pullData(this.selectedData, this.selectedLocation);
     },
 
     graphMounted() {
@@ -381,13 +385,18 @@ let app = new Vue({
       return Math.min.apply(Math, par);
     },
 
-    pullData(selectedData) {
-
-      if (selectedData == 'Confirmed Cases') {
-       Plotly.d3.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv", this.processData);
-      } else if (selectedData == 'Reported Deaths') {
-       Plotly.d3.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv", this.processData);
+    pullData(selectedData, selectedLocation) {
+      let location = 'global';
+      let data = 'confirmed';
+      if (selectedLocation == 'State' || selectedLocation == 'US County') {
+        location = 'US';
       }
+      if (selectedData == 'Confirmed Cases') {
+        data = 'confirmed';
+      } else if (selectedData == 'Reported Deaths') {
+        data = 'deaths';
+      }
+      Plotly.d3.csv(`https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_${data}_${location}.csv`, this.processData);
     },
 
     removeRepeats(array) {
@@ -396,15 +405,23 @@ let app = new Vue({
 
     processData(data) {
 
-      let countriesToLeaveOut = ['Cruise Ship', 'Diamond Princess'];
+      let countriesToLeaveOut = ['Cruise Ship', 'Diamond Princess', ''];
 
       let renameCountries = {
         'Taiwan*': 'Taiwan',
         'Korea, South': 'South Korea'
       };
 
-      let countries = data.map(e => e["Country/Region"]);
-      countries = this.removeRepeats(countries);
+      let data_key = 'Country/Region';
+      if (this.selectedLocation == 'State') {
+        data_key = 'Province_State';
+      } else if (this.selectedLocation == 'US County') {
+        data_key = 'Combined_Key';
+      } else if (this.selectedLocation == 'Province') {
+        data_key = 'Province/State';
+      }
+      let locations = data.map(e => e[data_key]);
+      locations = this.removeRepeats(locations);
 
       let dates = Object.keys(data[0]).slice(4);
       this.dates = dates;
@@ -412,25 +429,25 @@ let app = new Vue({
       //this.day = this.dates.length;
 
       let myData = [];
-      for (let country of countries){
-        let countryData = data.filter(e => e["Country/Region"] == country);
+      for (let location of locations){
+        let locationData = data.filter(e => e[data_key] == location);
         let arr = [];
 
         for (let date of dates) {
-          let sum = countryData.map(e => parseInt(e[date]) || 0).reduce((a,b) => a+b);
+          let sum = locationData.map(e => parseInt(e[date]) || 0).reduce((a,b) => a+b);
           arr.push(sum);
         }
 
-        if (!countriesToLeaveOut.includes(country)) {
+        if (!countriesToLeaveOut.includes(location)) {
 
           let slope = arr.map((e,i,a) => e - a[i - 7]);
 
-          if (Object.keys(renameCountries).includes(country)) {
-            country = renameCountries[country];
+          if (Object.keys(renameCountries).includes(location)) {
+            location = renameCountries[location];
           }
 
           myData.push({
-            country: country,
+            country: location,
             cases: arr.map(e => e >= this.minCasesInCountry ? e : NaN),
             slope: slope.map((e,i) => arr[i] >= this.minCasesInCountry ? e : NaN),
           });
@@ -579,7 +596,11 @@ let app = new Vue({
 
     paused: true,
 
+    locationTypes: ['Country', 'State', 'US County', 'Province'],
+
     dataTypes: ['Confirmed Cases', 'Reported Deaths'],
+
+    selectedLocation: 'Country',
 
     selectedData: 'Confirmed Cases',
 
@@ -603,7 +624,9 @@ let app = new Vue({
 
     isHidden: true,
 
-    selectedCountries: ['Australia', 'Canada', 'China', 'France', 'Germany', 'Iran', 'Italy', 'Japan', 'South Korea', 'Spain', 'Switzerland', 'US', 'United Kingdom', 'India', 'Pakistan'],
+    selectedCountries: ['Australia', 'Canada', 'China', 'France', 'Germany', 'Iran', 'Italy', 'Japan', 'South Korea', 'Spain', 'Switzerland', 'US', 'United Kingdom', 'India', 'Pakistan', 'New York', 'New Jersey', 'Michigan', 'California', 'Washington', 'Hubei', 'Quebec', 'New South Wales'],
+
+    // selectedStates: [],
 
     graphMounted: false,
 

@@ -94,6 +94,12 @@
         <div>
           <h2>Customize</h2>
 
+          <select v-model="selectedLocation" @mousedown="pause">
+            <option v-for="l in locationTypes" v-bind:value="l">
+              {{ l }}
+            </option>
+          </select>
+
           <select v-model="selectedData" @mousedown="pause">
             <option v-for="d in dataTypes" v-bind:value="d">
               {{ d }}
